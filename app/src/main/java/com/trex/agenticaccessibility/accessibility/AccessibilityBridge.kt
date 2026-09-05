@@ -6,12 +6,12 @@ import android.graphics.Path
 import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
+import android.view.Display
 import android.view.accessibility.AccessibilityNodeInfo
 import com.trex.agenticaccessibility.agent.ActionResult
 import com.trex.agenticaccessibility.ai.*
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
-import java.util.concurrent.Executor
 
 object AccessibilityBridge {
     @Volatile private var service: AccessibilityService? = null
@@ -32,16 +32,15 @@ object AccessibilityBridge {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return ActionResult(false, "Screenshot capture requires Android 11+")
         return suspendCancellableCoroutine { cont ->
             try {
-                s.takeScreenshot(
-                    AccessibilityService.SCREENSHOT_TYPE_FULL_SCREEN,
-                    Executor { command -> command.run() }
-                ) { result ->
-                    if (cont.isActive) {
-                        result?.let { it.bitmap.recycle() }
-                        cont.resume(ActionResult(true, "Screenshot captured for agent use; it was not persisted"))
+                s.takeScreenshot(Display.DEFAULT_DISPLAY, s.mainExecutor, object : AccessibilityService.TakeScreenshotCallback {
+                    override fun onSuccess(screenshot: AccessibilityService.ScreenshotResult) {
+                        runCatching { screenshot.hardwareBuffer.close() }
+                        if (cont.isActive) cont.resume(ActionResult(true, "Screenshot captured; pixels were not persisted"))
                     }
-                }
-                cont.invokeOnCancellation { }
+                    override fun onFailure(errorCode: Int) {
+                        if (cont.isActive) cont.resume(ActionResult(false, "Screenshot failed (code $errorCode)"))
+                    }
+                })
             } catch (e: Exception) {
                 if (cont.isActive) cont.resume(ActionResult(false, e.message ?: "Screenshot failed"))
             }
@@ -76,9 +75,10 @@ object AccessibilityBridge {
             val n = findBest(r, target)
             r.recycle()
             if (n != null) {
+                val bounds = Rect(); n.getBoundsInScreen(bounds)
                 val ok = if (n.isClickable || n.isFocusable) n.performAction(AccessibilityNodeInfo.ACTION_CLICK)
                 else n.parent?.performAction(AccessibilityNodeInfo.ACTION_CLICK) ?: false
-                val bounds = Rect(); n.getBoundsInScreen(bounds); n.recycle()
+                n.recycle()
                 if (ok) return ActionResult(true, "Tapped $target")
                 if (a.x == null || a.y == null) return tapAt(s, bounds.centerX().toFloat(), bounds.centerY().toFloat(), "Tapped $target by bounds")
             }
@@ -89,18 +89,14 @@ object AccessibilityBridge {
 
     private fun tapAt(s: AccessibilityService, x: Float, y: Float, message: String): ActionResult {
         val p = Path().apply { moveTo(x, y) }
-        val gesture = GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(p, 0, 120))
-            .build()
+        val gesture = GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(p, 0, 120)).build()
         return ActionResult(s.dispatchGesture(gesture, null, null), message)
     }
 
     private fun findBest(n: AccessibilityNodeInfo, target: String): AccessibilityNodeInfo? {
         val candidates = ArrayList<Pair<Int, AccessibilityNodeInfo>>()
         collectMatches(n, target, candidates)
-        return candidates.maxByOrNull { it.first }?.second.also { selected ->
-            candidates.filter { it.second !== selected }.forEach { it.second.recycle() }
-        }
+        return candidates.maxByOrNull { it.first }?.second.also { selected -> candidates.filter { it.second !== selected }.forEach { it.second.recycle() } }
     }
 
     private fun collectMatches(n: AccessibilityNodeInfo, target: String, out: MutableList<Pair<Int, AccessibilityNodeInfo>>) {
@@ -123,10 +119,7 @@ object AccessibilityBridge {
         if (!a.target.isNullOrBlank()) {
             val r = s.rootInActiveWindow ?: return ActionResult(false, "No active window")
             val target = findBest(r, a.target!!.trim()); r.recycle()
-            if (target != null) {
-                target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-                target.recycle()
-            }
+            if (target != null) { target.performAction(AccessibilityNodeInfo.ACTION_FOCUS); target.recycle() }
         }
         val r = s.rootInActiveWindow ?: return ActionResult(false, "No active window")
         val f = r.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: r.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)

@@ -13,6 +13,7 @@ import com.trex.agenticaccessibility.security.SecureStore
 import com.trex.agenticaccessibility.voice.AndroidSpeechToText
 import com.trex.agenticaccessibility.voice.AndroidTextToSpeech
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private lateinit var controller: AgentController

@@ -1,6 +1,8 @@
 package com.trex.agenticaccessibility
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.*
@@ -26,8 +28,10 @@ class MainActivity : ComponentActivity() {
         access.setOnClickListener{startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))}
         start.setOnClickListener{store.put("endpoint",endpoint.text.toString().trim());store.put("model",model.text.toString().trim());if(key.text.isNotBlank())store.put("api_key",key.text.toString());controller.start(task.text.toString())}
         stop.setOnClickListener{controller.stop();status.text="■ Stopped"}
-        mic.setOnClickListener{AndroidSpeechToText(this).listen{spoken->task.setText(spoken);controller.start(spoken)}}
+        mic.setOnClickListener{if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED)requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO),42) else listen(mic)}
         lifecycleScope.launch{controller.events.collect{status.text=it.status;log.text="Activity log\n"+it.log.joinToString("\n")}}
     }
+    private fun listen(button:Button){AndroidSpeechToText(this).listen{spoken->runOnUiThread{findViewById<EditText>(android.R.id.content)?.setText(spoken);controller.start(spoken)}}}
+    override fun onRequestPermissionsResult(requestCode:Int,permissions:Array<out String>,grantResults:IntArray){super.onRequestPermissionsResult(requestCode,permissions,grantResults);if(requestCode==42&&grantResults.firstOrNull()==PackageManager.PERMISSION_GRANTED) Toast.makeText(this,"Microphone ready. Press Push to talk again.",Toast.LENGTH_SHORT).show()}
     override fun onDestroy(){controller.stop();super.onDestroy()}
 }

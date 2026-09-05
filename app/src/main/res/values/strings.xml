@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Agentic Accessibility</string>
+    <string name="accessibility_service_description">Allows Agentic Accessibility to inspect the current screen and perform user-requested Android interactions.</string>
+</resources>

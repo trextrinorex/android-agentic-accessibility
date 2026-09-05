@@ -4,5 +4,4 @@
     android:notificationTimeout="100"
     android:canRetrieveWindowContent="true"
     android:canPerformGestures="true"
-    android:canRequestFilterKeyEvents="false"
-    android:description="Allows the AI agent to observe and interact with Android apps on your behalf." />
+    android:canRequestFilterKeyEvents="false" />

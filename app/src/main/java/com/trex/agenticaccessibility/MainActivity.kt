@@ -33,6 +33,6 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch{controller.events.collect{status.text=it.status;log.text="Activity log\n"+it.log.joinToString("\n")}}
     }
     private fun listen(){AndroidSpeechToText(this).listen{spoken->runOnUiThread{task.setText(spoken);controller.start(spoken)}}}
-    override fun onRequestPermissionsResult(requestCode:Int,permissions:Array<out String>,grantResults:IntArray){super.onRequestPermissionsResult(requestCode,permissions,grantResults);if(requestCode==42&&grantResults.firstOrNull()==PackageManager.PERMISSION_GRANTED)listen()}
+    override fun onRequestPermissionsResult(requestCode:Int,permissions:Array<String>,grantResults:IntArray){super.onRequestPermissionsResult(requestCode,permissions,grantResults);if(requestCode==42&&grantResults.firstOrNull()==PackageManager.PERMISSION_GRANTED)listen()}
     override fun onDestroy(){controller.stop();super.onDestroy()}
 }
